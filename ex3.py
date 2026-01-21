@@ -1,6 +1,7 @@
-from typing import Any, List
+from typing import Any, List, Optional, Tuple
 from itertools import product
-from collections import Counter
+from collections import Counter, defaultdict
+from functools import lru_cache
 
 ids = ["111111111, 222222222"]
 
@@ -34,10 +35,9 @@ def to_CNF(input: list[tuple[int, int], tuple[int, int, int], tuple[int, int, in
         # set all other values for that cell to False
         for other_val in range(1, N + 1):
             if other_val != val:
-                #variables.remove(f'{x},{y},{other_val}')
-                #clauses.append([(f'{x},{y},{other_val}', False)])
+                # variables.remove(f'{x},{y},{other_val}')
+                # clauses.append([(f'{x},{y},{other_val}', False)])
                 pass
-
 
     # Every square has exactly one number in it:
     for i, j in product(range(N), range(N)):
@@ -93,6 +93,7 @@ def to_CNF(input: list[tuple[int, int], tuple[int, int, int], tuple[int, int, in
     return variables, clauses
 
 
+'''
 def unit_propogation(variables, CNF_formula, assignment):
     while True:
         # Check current status
@@ -135,8 +136,181 @@ def unit_propogation(variables, CNF_formula, assignment):
             assignment[var_name] = bool_val
 
     return None
+'''
 
 
+def unit_propogation(variables, CNF_formula, assignment):
+    current_formula = CNF_formula
+
+    while True:
+        units = []
+        new_formula = []
+
+        for clause in current_formula:
+            status, value = clause_status(clause, assignment)
+
+            if status == "conflict":
+                return False, [], []
+            elif status == "satisfied":
+                continue
+            elif status == "unit":
+                units.append(value)
+                new_formula.append(clause)
+            else:
+                new_formula.append(clause)
+
+        # Update formula for next pass
+        current_formula = new_formula
+
+        if not units:
+            # RETURN THE SIMPLIFIED FORMULA
+            return None, assignment, current_formula
+
+        # Determine assignments
+        new_assignments = {}
+        for var_name, bool_val in units:
+            if var_name in assignment and assignment[var_name] != bool_val:
+                return False, [], []  # Conflict
+            if var_name in new_assignments and new_assignments[var_name] != bool_val:
+                return False, [], []  # Conflict within current unit batch
+
+            assignment[var_name] = bool_val
+            new_assignments[var_name] = bool_val
+
+        # If the formula is empty, we are done
+        if not current_formula:
+            return True, assignment, []
+
+
+def solve_SAT(variables, CNF_formula, assignment) -> tuple[bool, list]:
+    # 1. Simplify formula (Unit Propagation)
+    # Note: We now capture the simplified 'current_formula'
+    res_status, res_assignment, simplified_formula = unit_propogation(variables, CNF_formula, assignment)
+
+    if res_status is False:
+        return False, []
+    if res_status is True:
+        return True, res_assignment
+
+    # 2. Select Variable
+    # Note: Pass simplified_formula to MOM (faster)
+    # Note: Pass variables list to MRV (required)
+
+    chosen_var = heuristic_MOM(simplified_formula, assignment)
+    #chosen_var = heuristic_MRV(variables, assignment)
+
+    if chosen_var is None:
+        # Logic safeguard: if no var chosen but formula not empty
+        return True, assignment
+
+    # 3. Recursive Backtracking
+
+    # Try True
+    assignment_true = assignment.copy()
+    assignment_true[chosen_var] = True
+    is_sat, final_assign = solve_SAT(variables, simplified_formula, assignment_true)
+    if is_sat:
+        return True, final_assign
+
+    # Try False
+    assignment_false = assignment.copy()
+    assignment_false[chosen_var] = False
+    is_sat, final_assign = solve_SAT(variables, simplified_formula, assignment_false)
+    if is_sat:
+        return True, final_assign
+
+    return False, []
+
+
+def get_unassigned_vars(clause, assignment):
+    """Helper: Returns list of variables in a clause that are not yet in assignment."""
+    return [lit[0] for lit in clause if lit[0] not in assignment]
+
+
+# --- Helper with Caching ---
+@lru_cache(maxsize=None)
+def get_var_coords(var_str: str) -> tuple[str, str]:
+    """
+    Parses 'row,col,val' and returns ('row', 'col').
+    Cached to avoid repeated string splitting.
+    """
+    parts = var_str.split(',')
+    return parts[0], parts[1]
+
+
+# --- Optimized Heuristics ---
+
+def heuristic_MOM(clauses: list, assignment: dict) -> Optional[str]:
+    """
+    Maximum Occurrences in Minimum Length Clauses.
+    Optimized to avoid list allocations and unnecessary looping.
+    """
+    min_len = float('inf')
+    counts = defaultdict(int)
+
+    for clause in clauses:
+        # 1. Check if satisfied & count unassigned in one pass
+        # This avoids creating a list of unassigned vars unless needed
+        unassigned = []
+        is_satisfied = False
+
+        for var, polarity in clause:
+            if var in assignment:
+                if assignment[var] == polarity:
+                    is_satisfied = True
+                    break
+            else:
+                unassigned.append(var)
+
+        if is_satisfied:
+            continue
+
+        # 2. Process active clause
+        curr_len = len(unassigned)
+        if curr_len == 0:
+            continue  # Conflict (should be handled by unit_prop, but safety first)
+
+        if curr_len < min_len:
+            min_len = curr_len
+            counts.clear()  # Reset counts for new minimum length
+            for var in unassigned:
+                counts[var] += 1
+        elif curr_len == min_len:
+            for var in unassigned:
+                counts[var] += 1
+
+    if not counts:
+        return None
+    return max(counts, key=counts.get)
+
+
+def heuristic_MRV(variables: list, assignment: dict) -> Optional[str]:
+    """
+    Minimum Remaining Values (Sudoku Specific).
+    Iterates variables directly (O(N)) instead of clauses (O(M)).
+    """
+    cell_counts = defaultdict(int)
+    cell_vars = defaultdict(list)
+
+    # Iterate ALL variables to find unassigned ones
+    for var in variables:
+        if var not in assignment:
+            r, c = get_var_coords(var)
+            cell_key = (r, c)
+            cell_counts[cell_key] += 1
+            cell_vars[cell_key].append(var)
+
+    if not cell_counts:
+        return None
+
+    # Find the cell with the minimum (>0) candidates
+    # This implies the most constrained cell
+    best_cell = min(cell_counts, key=cell_counts.get)
+
+    # Return the first available variable for that cell
+    return cell_vars[best_cell][0]
+
+'''
 def solve_SAT(variables, CNF_formula, assignment) -> tuple[bool, list]:
     # 1. Simplify formula based on current assignment (Unit Propagation Loop)
     # We loop until no more unit clauses are found
@@ -159,7 +333,13 @@ def solve_SAT(variables, CNF_formula, assignment) -> tuple[bool, list]:
         return True, assignment
 
     # Pick variable with highest count
-    chosen_var, _ = literal_counts.most_common(1)[0]
+    # chosen_var, _ = literal_counts.most_common(1)[0]
+
+    # Option 2: MOM (Good for general SAT performance)
+    chosen_var = heuristic_MOM(CNF_formula, assignment)
+
+    # Option 3: MRV (Best for Sudoku logic)
+    # chosen_var = heuristic_MRV(CNF_formula, assignment)
 
     # 3. Recursive Backtracking (Branching)
     # Try setting chosen_var to True
@@ -178,7 +358,7 @@ def solve_SAT(variables, CNF_formula, assignment) -> tuple[bool, list]:
 
     # If both failed, this path is dead
     return False, []
-
+'''
 
 # assignment structure: dict{ variable_name (str) -> bool_value (bool) }
 def clause_status(clause, assignment):
