@@ -35,14 +35,16 @@ def to_CNF(input: list[tuple[int, int], tuple[int, int, int], tuple[int, int, in
         for other_val in range(1, N + 1):
             if other_val != val:
                 #variables.remove(f'{x},{y},{other_val}')
-                clauses.append([(f'{x},{y},{other_val}', False)])
+                #clauses.append([(f'{x},{y},{other_val}', False)])
+                pass
+
 
     # Every square has exactly one number in it:
     for i, j in product(range(N), range(N)):
         # some value should be in the square - unit clause
         clauses.append([(f'{i},{j},{val}', True) for val in range(1, N + 1)])
 
-        # if some digit d is in the square then d` shouldn't be
+        # if some digit d is in the square then d' shouldn't be
         for val1, val2 in product(range(1, N + 1), range(1, N + 1)):
             if val1 < val2:
                 clauses.append([(f'{i},{j},{val1}', False), (f'{i},{j},{val2}', False)])
@@ -64,10 +66,19 @@ def to_CNF(input: list[tuple[int, int], tuple[int, int, int], tuple[int, int, in
     # A number never appears twice in the same rectangle:
     for i1, j1 in product(range(N), range(N)):
         for i2, j2 in product(range(N), range(N)):
-            if (i1 // L == i2 // L) and (j1 // K == j2 // K) and (i1 < i2 or (i1 == i2 and j1 < j2)):
+            # Check if same box
+            same_box = (i1 // L == i2 // L) and (j1 // K == j2 // K)
+
+            # Ensure we only process pairs once (ordering)
+            valid_ordering = (i1 < i2 or (i1 == i2 and j1 < j2))
+
+            # REDUNDANCY CHECK: Skip if they share a row (i1==i2) or col (j1==j2)
+            # We only want diagonal relationships within the box here.
+            not_row_or_col = (i1 != i2) and (j1 != j2)
+
+            if same_box and valid_ordering and not_row_or_col:
                 for digit in range(1, N + 1):
                     clauses.append([(f'{i1},{j1},{digit}', False), (f'{i2},{j2},{digit}', False)])
-
     # sum constraints:
     for constraint in sum_constraints:
         x1, y1, x2, y2, target_sum = constraint
@@ -78,7 +89,7 @@ def to_CNF(input: list[tuple[int, int], tuple[int, int, int], tuple[int, int, in
             else:
                 clauses.append([(f'{x1},{y1},{val}', False)])
 
-    # print(f'CNF has {len(clauses)} clauses and {len(variables)} variables')
+    print(f'CNF has {len(clauses)} clauses and {len(variables)} variables')
     return variables, clauses
 
 
@@ -211,5 +222,5 @@ def numbers_assignment(variables: list, assignment: dict, input: Any) -> List[Li
         if var in assignment.keys() and assignment[var]:
             i, j, v = map(int, var.split(','))
             board[i][j] = v
-    #print(board)
+    # print(board)
     return board

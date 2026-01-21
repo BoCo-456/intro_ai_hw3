@@ -157,33 +157,36 @@ def solve_and_visualize():
     print(f"Found {len(PROBLEMS)} problems in inputs.py...")
 
     for i, problem in enumerate(PROBLEMS):
-        print(f"\n--- Solving Problem {i + 1} ---")
-        
-        start_time = time.time()
-        
-        # 1. Translate to CNF
-        print("Translating to CNF...", end=" ", flush=True)
-        variables, cnf_formula = ex3.to_CNF(problem)
-        print("Done.")
-        
-        # 2. Solve SAT
-        print("Running SAT Solver...", end=" ", flush=True)
-        is_satisfiable, assignment = ex3.solve_SAT(variables, cnf_formula, {})
-        print(f"Done. Satisfiable? {is_satisfiable}")
-        
-        # 3. Generate Assignment and Visualize
-        if is_satisfiable:
-            # Convert boolean assignment back to N x N matrix
-            solved_board = ex3.numbers_assignment(variables, assignment, problem)
-            
-            # Generate HTML
-            filename = os.path.join(output_dir, f"solution_{i+1}.html")
-            generate_solved_html(problem, solved_board, filename)
-        else:
-            print(f" >> No solution found for Problem {i+1}, skipping visualization.")
-            
-        elapsed = time.time() - start_time
-        print(f"Time taken: {elapsed:.4f} seconds")
+        try:
+            print(f"\n--- Solving Problem {i + 1} ---")
+
+            start_time = time.time()
+
+            # 1. Translate to CNF
+            print("Translating to CNF...", end=" ", flush=True)
+            variables, cnf_formula = ex3.to_CNF(problem)
+            print("Done.")
+
+            # 2. Solve SAT
+            print("Running SAT Solver...", end=" ", flush=True)
+            is_satisfiable, assignment = ex3.solve_SAT(variables, cnf_formula, {})
+            print(f"Done. Satisfiable? {is_satisfiable}")
+
+            # 3. Generate Assignment and Visualize
+            if is_satisfiable:
+                # Convert boolean assignment back to N x N matrix
+                solved_board = ex3.numbers_assignment(variables, assignment, problem)
+
+                # Generate HTML
+                filename = os.path.join(output_dir, f"solution_{i+1}.html")
+                generate_solved_html(problem, solved_board, filename)
+            else:
+                print(f" >> No solution found for Problem {i+1}, skipping visualization.")
+
+            elapsed = time.time() - start_time
+            print(f"Time taken: {elapsed:.4f} seconds")
+        except KeyboardInterrupt:
+            continue
 
 if __name__ == "__main__":
     solve_and_visualize()

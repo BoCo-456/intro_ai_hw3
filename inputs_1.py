@@ -117,3 +117,4 @@ hard_problems = [
         []  # No sum constraints visible in this specific input
     ]
 ]
+non_comp_problems = hard_problems
