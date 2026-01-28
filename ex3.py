@@ -12,7 +12,7 @@ list[
     tuple[int, int, int]: (x, y, val) of each pre-filled cell
     tuple[int, int, int, int, int]: (x1, y1, x2, y2, sum) of each sum constraint
 ]
- '''
+'''
 
 
 def to_CNF(input: list[tuple[int, int], tuple[int, int, int], tuple[int, int, int, int, int]]) -> tuple[
@@ -89,7 +89,7 @@ def to_CNF(input: list[tuple[int, int], tuple[int, int, int], tuple[int, int, in
             else:
                 clauses.append([(f'{x1},{y1},{val}', False)])
 
-    print(f'CNF has {len(clauses)} clauses and {len(variables)} variables')
+    # print(f'CNF has {len(clauses)} clauses and {len(variables)} variables')
     return variables, clauses
 
 
@@ -196,8 +196,8 @@ def solve_SAT(variables, CNF_formula, assignment) -> tuple[bool, list]:
     # Note: Pass simplified_formula to MOM (faster)
     # Note: Pass variables list to MRV (required)
 
-    chosen_var = heuristic_MOM(simplified_formula, assignment)
-    #chosen_var = heuristic_MRV(variables, assignment)
+    # chosen_var = heuristic_MOM(simplified_formula, assignment)
+    chosen_var = heuristic_MRV(variables, assignment)
 
     if chosen_var is None:
         # Logic safeguard: if no var chosen but formula not empty
@@ -310,6 +310,7 @@ def heuristic_MRV(variables: list, assignment: dict) -> Optional[str]:
     # Return the first available variable for that cell
     return cell_vars[best_cell][0]
 
+
 '''
 def solve_SAT(variables, CNF_formula, assignment) -> tuple[bool, list]:
     # 1. Simplify formula based on current assignment (Unit Propagation Loop)
@@ -359,6 +360,7 @@ def solve_SAT(variables, CNF_formula, assignment) -> tuple[bool, list]:
     # If both failed, this path is dead
     return False, []
 '''
+
 
 # assignment structure: dict{ variable_name (str) -> bool_value (bool) }
 def clause_status(clause, assignment):

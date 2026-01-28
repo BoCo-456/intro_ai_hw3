@@ -1,6 +1,6 @@
 import ex3 as ex3
 import time
-from inputs_1 import non_comp_problems
+from inputs import non_comp_problems
 
 TIMEOUT_DURATION = 60
 
